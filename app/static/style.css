@@ -1,0 +1,17 @@
+body {
+background-color: #43505a;
+color: #c9cde1;
+}
+
+a {
+color: #219fff;
+}
+
+h1 {
+font-family: "Noto Sans", sans-serif;
+font-weight: 550;
+}
+
+p, a, footer {
+font-family: "Noto Sans", sans-serif;
+}
