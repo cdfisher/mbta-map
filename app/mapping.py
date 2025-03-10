@@ -163,7 +163,7 @@ def build_lines_layer(routes: list) -> pdk.Layer:
         i = 0
         for s in shapes:
             if (route, i) not in extra_tracks:
-                rows.append([f"{route} {i}", s, COLORS[route]])
+                rows.append([f"{route}", s, COLORS[route]])
                 i += 1
 
     cols = ['label', 'path', 'color']
