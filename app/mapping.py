@@ -7,7 +7,7 @@ import pandas as pd
 
 from dotenv import load_dotenv
 
-from utils import Stop, Vehicle
+from utils import *
 
 load_dotenv()
 USER_AGENT = os.getenv('USER_AGENT')
@@ -108,23 +108,55 @@ def _get_vehicles(route_id: str) -> list:
         raise requests.exceptions.HTTPError(f"Encountered HTTP error, status {status}")
 
     vehicles = []
+    trips = []
     for d in jdata['data']:
         attrs = d['attributes']
+        trip_id = d['relationships']['trip']['data']['id']
 
         vehicles.append(Vehicle(attrs['label'], attrs['latitude'], attrs['longitude'], attrs['bearing'],
                                 attrs['direction_id'], attrs['speed'],
-                                (True if attrs['revenue'] == 'REVENUE' else False)))
+                                (True if attrs['revenue'] == 'REVENUE' else False),
+                                trip_id))
+        trips.append(trip_id)
+
+    filter_str = ''
+    for t in range(len(trips)-1):
+        filter_str = f"{filter_str}{trips[t]},"
+
+    filter_str = f"{filter_str}{trips[-1]}"
+
+    # query api
+    jdata, status = _query_api(f"trips?filter[id]={filter_str}")
+    if status > 399:
+        raise requests.exceptions.HTTPError(f"Encountered HTTP error, status {status}")
+
+    # for each in response add trip_id:headsign to a dict
+    headsigns = {}
+    for d in jdata['data']:
+        h = d['attributes']['headsign']
+        _id = d['id']
+        headsigns[_id] = h
+
+    # for v in vehicles
+    # v.set_headsign(headsigns[trip_id])
+    for v in vehicles:
+        try:
+            v.set_headsign(headsigns[v.trip_id])
+        except KeyError:
+            v.set_headsign(None)
+
     return vehicles
 
 
+# TODO potentially migrate to IconLayer
 def build_stops_layer(routes: list) -> pdk.Layer:
     rows = []
     for route in routes:
         stops = _get_stops(route)
         for s in stops:
-            rows.append([s.name, s.location, COLORS[route]])
+            rows.append([s.name, f"<h3 style=\"margin:0;padding:0;\">{s.name}</h3>", s.location, COLORS[route]])
 
-    cols = ['label', 'coordinates', 'color']
+    cols = ['name', 'label', 'coordinates', 'color']
     stops_df = pd.DataFrame(rows, columns=cols)
 
     stops_layer = pdk.Layer(
@@ -142,6 +174,8 @@ def build_stops_layer(routes: list) -> pdk.Layer:
         get_line_color=[0, 0, 0],
         get_fill_color="color"
     )
+
+    stops_df.to_csv('stops.csv', columns=['name', 'coordinates'])
 
     return stops_layer
 
@@ -183,15 +217,18 @@ def build_lines_layer(routes: list) -> pdk.Layer:
     return path_layer
 
 
+# TODO potentially migrate to IconLayer
 def build_vehicles_layer(routes: list) -> pdk.Layer:
     rows = []
     for route in routes:
         vehicles = _get_vehicles(route)
         for v in vehicles:
-            label = f"<b>Name: </b>{v.name}<br>" \
+            # TODO add carriages list to tooltip
+            label = f"<h3 style=\"margin:0;padding:0;\">{v.headsign} train</h3>" \
+                    f"<h4 style=\"margin:0;padding:0;\">{f'Green Line {route[-1]}' if route[0:5] == 'Green' else f'{route} Line'}</h4><br>" \
                     f"<b>Bearing: </b>{v.bearing}<br>" \
-                    f"<b>Speed: </b>{v.speed}<br>" \
-                    f"<b>Revenue?: </b>{'Yes' if v.is_revenue else 'No'}"
+                    f"{f'<b>Speed: </b>{v.speed}<br>' if v.speed is not None else ''}" \
+                    # f"<b>Revenue?: </b>{'Yes' if v.is_revenue else 'No'}"
             rows.append([label, v.location, COLORS[route], v.bearing, v.direction, v.speed, v.is_revenue])
 
     cols = ['label', 'coordinates', 'color', 'bearing', 'direction', 'speed', 'is_revenue']
@@ -216,8 +253,60 @@ def build_vehicles_layer(routes: list) -> pdk.Layer:
     return vehicles_layer
 
 
+def build_text_layer():
+    # Transfers and termini
+    stations_to_label = {
+        # Red Line
+        'Alewife',
+        'Ashmont',
+        'Braintree',
+        'JFK/UMass',
+        'South Station',
+        'Downtown Crossing',
+        'Park Street',
+        # Orange Line
+        'Oak Grove',
+        'Forest Hills',
+        'North Station',
+        'Haymarket',
+        'State',
+        # Blue Line
+        'Wonderland',
+        'Government Center',
+        'Bowdoin',
+        # Green Line
+        'Medford/Tufts',
+        'Union Square',
+        'Heath Street',
+        'Riverside',
+        'Cleveland Circle',
+        'Boston College'
+    }
+
+    stations = []
+    for s in stations_to_label:
+        stations.append([s, subway_stop_coords[s]])
+
+    labels_df = pd.DataFrame(stations, columns=['name', 'coordinates'])
+
+    text_layer = pdk.Layer(
+        'TextLayer',
+        labels_df,
+        get_position='coordinates',
+        get_text='name',
+        get_color=(201,205,225),
+        size_max_pixels=17,
+        font_weight=900,
+        #get_alignment_baseline='bottom',
+       # get_pixel_offset=[55, -20]
+        get_pixel_offset=[0, -30]
+    )
+
+    return text_layer
+
+
 def construct_map(routes: list):
-    layers = [build_lines_layer(routes), build_stops_layer(routes), build_vehicles_layer(routes)]
+    layers = [build_lines_layer(routes), build_stops_layer(routes), build_vehicles_layer(routes), build_text_layer()]
 
     view = pdk.View(type="MapView", controller='true', height="80%", width="100%")
 
