@@ -175,8 +175,6 @@ def build_stops_layer(routes: list) -> pdk.Layer:
         get_fill_color="color"
     )
 
-    stops_df.to_csv('stops.csv', columns=['name', 'coordinates'])
-
     return stops_layer
 
 
