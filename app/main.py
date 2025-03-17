@@ -45,11 +45,11 @@ def map_page(map_type: str):
         case 'busses':
             routes = bus_routes
         case 'trains':
-            routes = rapid_routes + commuter_routes
+            routes = commuter_routes + rapid_routes
         case 'core':
-            routes = rapid_routes + silver_line_routes
+            routes = silver_line_routes + rapid_routes
         case 'all':
-            routes = rapid_routes + silver_line_routes + commuter_routes
+            routes = commuter_routes + silver_line_routes + rapid_routes
 
         # no default since this should be unreachable
 
