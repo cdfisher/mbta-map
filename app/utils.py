@@ -1,27 +1,3 @@
-class Stop:
-    def __init__(self, name, latitude, longitude):
-        self.name = name
-        self.location = [longitude, latitude]
-
-
-class Vehicle:
-    def __init__(self, name, latitude, longitude, bearing, direction, speed, is_revenue, trip_id):
-        self.name = name
-        self.location = [longitude, latitude]
-        self.bearing = bearing
-        self.direction = direction
-        self.speed = speed
-        self.is_revenue = is_revenue
-        self.headsign = None
-        self.trip_id = trip_id
-
-    def set_headsign(self, headsign):
-        self.headsign = headsign
-
-    def __repr__(self):
-        return str(self.__dict__)
-
-
 subway_stop_coords = {'Alewife': [-71.141287, 42.39583],
                       'Davis': [-71.121815, 42.39674],
                       'Porter': [-71.119149, 42.3884],
