@@ -25,6 +25,13 @@
         p, a, footer {
         font-family: "Noto Sans", sans-serif;
         }
+
+        footer {
+        position:absolute;
+        bottom:0px;
+        width:95%;
+        z-index:1;
+        }
     </style>
     <h1 align="center">MBTA Live Train Locations</h1>
 </head>
@@ -33,4 +40,8 @@
         {{ iframe|safe }}
     </div>
 </body>
+<footer>
+    <p align="center"><a href="{{base_url}}">Home</a> · <a href="https://github.com/cdfisher/mbta-map">Source code on
+        GitHub</a> · Built with the MBTA's <a href="https://www.mbta.com/developers/v3-api">V3 API</a></p>
+</footer>
 </html>
