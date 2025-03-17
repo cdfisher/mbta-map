@@ -79,14 +79,11 @@ def build_shape_df(route_ids: list) -> pd.DataFrame:
 
         shapes = []
         for d in jdata['data']:
-            shapes.append(_polyline_to_coords(d['attributes']['polyline']))
+            if 'canonical' in d['id']:
+                shapes.append(_polyline_to_coords(d['attributes']['polyline']))
 
-        i = 0
         for s in shapes:
-            # TODO this can likely filter based on id rather than a (not super robust) numbered list
-            if (route, i) not in extra_tracks:
-                rows.append([f"{route}", s, COLORS[route]])
-                i += 1
+            rows.append([f"{route}", s, COLORS[route]])
 
     return pd.DataFrame(rows, columns=['label', 'path', 'color'])
 

@@ -23,18 +23,6 @@ COLORS = {
     'CR-NewBedford': (128, 39, 108),
 }
 
-# TODO this can likely get removed at some point with a little more poking around with the API
-extra_tracks = {
-    ('Red', 8),
-    ('Red', 9),
-    ('Orange', 2),
-    ('Orange', 8),
-    ('Orange', 12),
-    ('Orange', 13),
-    ('Orange', 16),
-    ('Orange', 17),
-}
-
 
 class Carriage:
     def __init__(self, c: dict):
