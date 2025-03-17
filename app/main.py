@@ -25,7 +25,7 @@ map_types = {
 
 @app.route('/')
 def index():
-    return render_template('index.html', iframe=generate_map(rapid_routes))
+    return render_template('index.html', base_url=request.root_url)
 
 
 @app.route('/map/<map_type>')
