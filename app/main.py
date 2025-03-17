@@ -33,7 +33,7 @@ def map_page(map_type: str):
     map_type = escape(map_type).lower()
     if map_type not in map_types:
         # invalid type, redirect home
-        flask.redirect(flask.url_for('index'))
+        flask.redirect(flask.url_for('index'), base_url=request.root_url)
 
     match map_type:
         case 'rapid':
@@ -53,7 +53,7 @@ def map_page(map_type: str):
 
         # no default since this should be unreachable
 
-    return render_template('map.html', iframe=generate_map(routes))
+    return render_template('map.html', iframe=generate_map(routes), base_url=request.root_url)
 
 
 if __name__ == '__main__':
