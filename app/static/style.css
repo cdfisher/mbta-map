@@ -1,17 +1,24 @@
 body {
-background-color: #43505a;
-color: #c9cde1;
+    background-color: #43505a;
+    color: #c9cde1;
 }
 
 a {
-color: #219fff;
+    color: #219fff;
 }
 
-h1 {
-font-family: "Noto Sans", sans-serif;
-font-weight: 550;
+h1, h2, h3, h4 {
+    font-family: "Noto Sans", sans-serif;
+    font-weight: 550;
 }
 
 p, a, footer {
-font-family: "Noto Sans", sans-serif;
+    font-family: "Noto Sans", sans-serif;
+}
+
+footer {
+    position:absolute;
+    bottom:0px;
+    width:95%;
+    z-index:1;
 }
