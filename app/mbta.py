@@ -23,6 +23,27 @@ COLORS = {
     'CR-NewBedford': (128, 39, 108),
 }
 
+color_priority = {
+    'Re': 0,
+    'Or': 1,
+    'Bl': 2,
+    'Gr': 3,
+    'CR': 4,
+    'SL': 5,
+    'Bus': 6,
+}
+
+# TODO add text colors
+colors = {
+    'Re': (255, 0, 0),
+    'Or': (237, 139, 0),
+    'Bl': (0, 61, 165),
+    'Gr': (0, 132, 61),
+    'CR': (128, 39, 108),
+    'SL': (124, 135, 142),
+    'Bus': (255, 199, 44),
+}
+
 
 class Carriage:
     def __init__(self, c: dict):
@@ -81,7 +102,7 @@ class Vehicle:
 
     # TODO this may need additional values added
     def row(self) -> list:
-        return [self.build_label(), self.location, COLORS[self.route], self.bearing]
+        return [self.build_label(), self.location, COLORS[self.route] if self.route in COLORS.keys() else (255, 199, 44), self.bearing]
 
 
 class Stop:
@@ -92,18 +113,31 @@ class Stop:
 
         if route is not None:
             self.routes_served = [route]
+            self._color_routes = {route[:2]} # Used to prioritize colors of routes
         else:
             self.routes_served = []
+            self._color_routes = {}
 
         self.name = attr['name']
         self.location = [attr['longitude'], attr['latitude']]
 
     def add_route(self, route):
         self.routes_served.append(route)
+        self._color_routes.add(route[:2])
+
+    # Somewhat hacky approach for prioritizing the color used to draw a stop
+    def get_color(self):
+        _colorlist = sorted(list(self._color_routes), key=lambda col: color_priority[col[:2]] if col[:2] in color_priority.keys() else color_priority['Bus'])
+        match _colorlist[0]:
+            case 'Re' | 'Or' | 'Bl' | 'Gr' | 'CR' | 'SL':
+                return colors[_colorlist[0]]
+            case _:
+                # Default to bus color if none of the above
+                return (255, 199, 44)
 
     def row(self) -> list:
         return [self.name, f"<h3 style=\"margin:0;padding:0;\">{self.name}</h3>",
-                self.stop_id, self.location, self.routes_served, COLORS[self.routes_served[0]]]
+                self.stop_id, self.location, self.routes_served, self.get_color()]
 
 
 class Station:
