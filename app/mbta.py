@@ -23,6 +23,15 @@ COLORS = {
     'CR-NewBedford': (128, 39, 108),
 }
 
+silver_line_route_names = {
+    '741': 'SL1',
+    '742': 'SL2',
+    '743': 'SL3',
+    '751': 'SL4',
+    '749': 'SL5',
+    '746': 'SLW',
+}
+
 color_priority = {
     'Re': 0,
     'Or': 1,
@@ -57,8 +66,18 @@ class Vehicle:
         rel = r['relationships']
         attr = r['attributes']
 
+        # This will be set later for all rapid transit and CR vehicles, so defaults to the color for busses
+        self.color = (255, 199, 44)
+
         # under relationships
         self.route = rel['route']['data']['id']  # for instance 'Green-B'
+        if self.route[:2] in colors.keys():
+            self.color = colors[self.route[:2]]
+        # Handle SL route IDs just being numerical values when in the case of those the short names are more helpful
+        if self.route in silver_line_route_names.keys():
+            self.route = silver_line_route_names[self.route]
+            self.color = (124, 135, 142)
+
         self.trip_id = rel['trip']['data']['id']  # (usually?) numerical trip ID
         if rel['stop']['data'] is not None:
             self.stop = rel['stop']['data']['id']  # this is a numerical (usually?) stop ID
@@ -93,7 +112,7 @@ class Vehicle:
 
     def build_label(self) -> str:
         # TODO will need to be modified for non-train vehicles
-        return f"<h3 style=\"margin:0;padding:0;\">{self.headsign} train</h3>" \
+        return f"<h3 style=\"margin:0;padding:0;\">{self.headsign} {'train' if self.route[:2] in ('Re', 'Or', 'Bl', 'Gr', 'CR') else 'bus'}</h3>" \
                f"<h4 style=\"margin:0;padding:0;\">" \
                f"{f'Green Line {self.route[-1]}' if self.route[0:5] == 'Green' else f'{self.route} Line'}</h4><br>" \
                f"{f'<b>Carriages: </b>{self.carriages_str()}<br>' if len(self.carriages_str()) > 0 else ''}" \
@@ -102,7 +121,7 @@ class Vehicle:
 
     # TODO this may need additional values added
     def row(self) -> list:
-        return [self.build_label(), self.location, COLORS[self.route] if self.route in COLORS.keys() else (255, 199, 44), self.bearing]
+        return [self.build_label(), self.location, self.color, self.bearing]
 
 
 class Stop:
@@ -112,8 +131,14 @@ class Stop:
         self.stop_id = s['id']
 
         if route is not None:
+            # Handle SL route IDs just being numerical values when in the case of those the short names are more helpful
+            if route in silver_line_route_names.keys():
+                route = silver_line_route_names[route]
             self.routes_served = [route]
-            self._color_routes = {route[:2]} # Used to prioritize colors of routes
+            # Since only the first two characters of a route are consistent enough to use them
+            # for a lookup, just store those so they can be used to prioritize colors of routes later.
+            # Uses a set to avoid duplication from multipls CR lines, etc
+            self._color_routes = {route[:2]}
         else:
             self.routes_served = []
             self._color_routes = {}
@@ -122,18 +147,26 @@ class Stop:
         self.location = [attr['longitude'], attr['latitude']]
 
     def add_route(self, route):
+        # Handle SL route IDs just being numerical values when in the case of those the short names are more helpful
+        if route in silver_line_route_names.keys():
+            route = silver_line_route_names[route]
         self.routes_served.append(route)
+        # Since only the first two characters of a route are consistent enough to use them
+        # for a lookup, just store those
         self._color_routes.add(route[:2])
 
     # Somewhat hacky approach for prioritizing the color used to draw a stop
     def get_color(self):
-        _colorlist = sorted(list(self._color_routes), key=lambda col: color_priority[col[:2]] if col[:2] in color_priority.keys() else color_priority['Bus'])
-        match _colorlist[0]:
-            case 'Re' | 'Or' | 'Bl' | 'Gr' | 'CR' | 'SL':
-                return colors[_colorlist[0]]
-            case _:
-                # Default to bus color if none of the above
-                return (255, 199, 44)
+        # Sort 'color routes' (first 2 chars of route names) based on a custom priority system (set with color_priority
+        # Since bus routes that aren't Silver Line don't have a consistent name, just a number, any key not found
+        _colorlist = sorted(list(self._color_routes), key=lambda col: color_priority[col[:2]] if
+                            col[:2] in color_priority.keys() else color_priority['Bus'])
+
+        if _colorlist[0] in colors.keys():
+            return colors[_colorlist[0]]
+        else:
+            # default to the color for a bus
+            return (255, 199, 44)
 
     def row(self) -> list:
         return [self.name, f"<h3 style=\"margin:0;padding:0;\">{self.name}</h3>",
