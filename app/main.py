@@ -9,7 +9,7 @@ rapid_routes = ['Red', 'Blue', 'Orange', 'Green-B', 'Green-C', 'Green-D', 'Green
 commuter_routes = ['CR-Fairmount', 'CR-Fitchburg', 'CR-Worcester', 'CR-Franklin', 'CR-Greenbush', 'CR-Haverhill',
                    'CR-Kingston', 'CR-Lowell', 'CR-Middleborough', 'CR-Needham', 'CR-Newburyport', 'CR-Providence',
                    'CR-Foxboro', 'CR-NewBedford']
-silver_line_routes = [] # TODO NYI
+silver_line_routes = ['741', '742', '743', '746', '749', '751']
 bus_routes = [] # Includes SL TODO NYI
 
 map_types = {
