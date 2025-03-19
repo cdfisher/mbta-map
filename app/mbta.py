@@ -1,3 +1,4 @@
+import re
 from collections import deque
 
 # TODO this can probably be handled better
@@ -45,6 +46,14 @@ colors = {
     'Bus': (255, 199, 44), # This case won't get hit directly but is included for reference
 }
 
+icon_data = {
+        "url": 'https://raw.githubusercontent.com/cdfisher/mbta-map/refs/heads/master/app/static/arrow.png',
+        "width": 150,
+        "height": 150,
+        "anchorY": 75,
+        "mask": True
+    }
+
 
 def get_priority(line: str) -> int:
     match line:
@@ -84,12 +93,18 @@ class Vehicle:
 
         # under relationships
         self.route = rel['route']['data']['id']  # for instance 'Green-B'
-        if self.route[:2] in colors.keys():
-            self.color = colors[self.route[:2]]
+        #if self.route[:2] in colors.keys():
+        #    self.color = colors[self.route[:2]]
         # Handle SL route IDs just being numerical values when in the case of those the short names are more helpful
         if self.route in silver_line_route_names.keys():
             self.route = silver_line_route_names[self.route]
             self.color = (124, 135, 142)
+
+        elif re.match(r'\d{1,3}', self.route):
+            self.color = colors['Bus']
+
+        else:
+            self.color = (201, 205, 225)
 
         self.trip_id = rel['trip']['data']['id']  # (usually?) numerical trip ID
         if rel['stop']['data'] is not None:
@@ -128,12 +143,11 @@ class Vehicle:
                f"<h4 style=\"margin:0;padding:0;\">" \
                f"{f'Green Line {self.route[-1]}' if self.route[0:5] == 'Green' else f'{self.route} Line'}</h4><br>" \
                f"{f'<b>Carriages: </b>{self.carriages_str()}<br>' if len(self.carriages_str()) > 0 else ''}" \
-               f"{f'<b>Bearing: </b>{self.bearing}<br>' if self.bearing is not None else ''}" \
                f"{f'<b>Speed (m/s) : </b>{self.speed}<br>' if self.speed is not None else ''}"
 
     # TODO this may need additional values added
     def row(self) -> list:
-        return [self.build_label(), self.location, self.color, self.bearing]
+        return [self.build_label(), self.location, self.color, self.bearing, icon_data]
 
 
 class Stop:

@@ -133,4 +133,4 @@ def build_vehicle_df(route_ids: list) -> pd.DataFrame:
     # vehicles are in a dict so a lookup can be done for predictions
 
     rows = [v.row() for v in vehicle_dict.values()]
-    return pd.DataFrame(rows, columns=['label', 'location', 'color', 'bearing'])
+    return pd.DataFrame(rows, columns=['label', 'location', 'color', 'bearing', 'icon'])

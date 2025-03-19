@@ -48,24 +48,19 @@ def build_stops_layer(route_ids: list) -> pdk.Layer:
     return stops_layer
 
 
-# TODO migrate to IconLayer
 def build_vehicles_layer(route_ids: list) -> pdk.Layer:
     vehicles_df = build_vehicle_df(route_ids)
 
     vehicles_layer = pdk.Layer(
-        'ScatterplotLayer',
+        'IconLayer',
         vehicles_df,
-        pickable=True,
-        opacity=1,
-        stroked=True,
-        filled=True,
-        radius_scale=10,
-        radius_min_pixels=6,
-        radius_max_pixels=400,
-        line_width_min_pixels=6,
         get_position='location',
-        get_line_color='color',
-        get_fill_color=[255, 255, 255]
+        get_icon='icon',
+        size_min_pixels=10,
+        size_scale=25,
+        pickable=True,
+        get_angle='405 - bearing',
+        get_color=(201, 205, 225) # For now ignore the new coloring logic, I may or may not keep it
     )
 
     return vehicles_layer
