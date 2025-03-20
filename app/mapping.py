@@ -59,8 +59,7 @@ def build_vehicles_layer(route_ids: list) -> pdk.Layer:
         size_min_pixels=10,
         size_scale=25,
         pickable=True,
-        get_angle='405 - bearing',
-        get_color=(201, 205, 225) # For now ignore the new coloring logic, I may or may not keep it
+        get_angle='360 - bearing',
     )
 
     return vehicles_layer
