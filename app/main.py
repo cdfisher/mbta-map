@@ -1,9 +1,14 @@
+import argparse
 import flask
 from flask import Flask, render_template, request
 from markupsafe import escape
 from mapping import generate_map
 
 app = Flask(__name__)
+
+ap = argparse.ArgumentParser()
+ap.add_argument('--debug', action='store_true')
+args = ap.parse_args()
 
 rapid_routes = ['Red', 'Blue', 'Orange', 'Green-B', 'Green-C', 'Green-D', 'Green-E']
 commuter_routes = ['CR-Fairmount', 'CR-Fitchburg', 'CR-Worcester', 'CR-Franklin', 'CR-Greenbush', 'CR-Haverhill',
@@ -57,4 +62,4 @@ def map_page(map_type: str):
 
 
 if __name__ == '__main__':
-    app.run(host='127.0.0.1', port=8080, debug=True)
+    app.run(host='127.0.0.1', port=8080, debug=args.debug)
