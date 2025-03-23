@@ -1,4 +1,3 @@
-import re
 from collections import deque
 
 # TODO this can probably be handled better
@@ -46,6 +45,13 @@ colors = {
     'Bus': (255, 199, 44), # This case won't get hit directly but is included for reference
 }
 
+rapid_routes = ['Red', 'Blue', 'Orange', 'Green-B', 'Green-C', 'Green-D', 'Green-E']
+commuter_routes = ['CR-Fairmount', 'CR-Fitchburg', 'CR-Worcester', 'CR-Franklin', 'CR-Greenbush', 'CR-Haverhill',
+                   'CR-Kingston', 'CR-Lowell', 'CR-Middleborough', 'CR-Needham', 'CR-Newburyport', 'CR-Providence',
+                   'CR-Foxboro', 'CR-NewBedford']
+silver_line_routes = ['741', '742', '743', '746', '749', '751']
+bus_routes = [] # Includes SL TODO NYI
+
 
 def get_priority(line: str) -> int:
     match line:
@@ -80,6 +86,7 @@ class Vehicle:
         rel = r['relationships']
         attr = r['attributes']
 
+        # TODO including route.color should be able to replace this
         # This will be set later for all rapid transit and CR vehicles, so defaults to the color for busses
         self.color = (255, 199, 44)
 
@@ -183,9 +190,12 @@ class Stop:
         # Handle SL route IDs just being numerical values when in the case of those the short names are more helpful
         if route in silver_line_route_names.keys():
             route = silver_line_route_names[route]
-        r = self.routes_served[0]
-        if get_priority(route) > get_priority(r):
-            self.routes_served.appendleft(route)
+        if len(self.routes_served) > 0:
+            r = self.routes_served[0]
+            if get_priority(route) > get_priority(r):
+                self.routes_served.appendleft(route)
+            else:
+                self.routes_served.append(route)
         else:
             self.routes_served.append(route)
 

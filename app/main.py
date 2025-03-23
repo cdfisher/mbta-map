@@ -3,16 +3,10 @@ import flask
 from flask import Flask, render_template, request
 from markupsafe import escape
 from mapping import generate_map
+from mbta import rapid_routes, commuter_routes, silver_line_routes, bus_routes
 
 app = Flask(__name__)
 
-
-rapid_routes = ['Red', 'Blue', 'Orange', 'Green-B', 'Green-C', 'Green-D', 'Green-E']
-commuter_routes = ['CR-Fairmount', 'CR-Fitchburg', 'CR-Worcester', 'CR-Franklin', 'CR-Greenbush', 'CR-Haverhill',
-                   'CR-Kingston', 'CR-Lowell', 'CR-Middleborough', 'CR-Needham', 'CR-Newburyport', 'CR-Providence',
-                   'CR-Foxboro', 'CR-NewBedford']
-silver_line_routes = ['741', '742', '743', '746', '749', '751']
-bus_routes = [] # Includes SL TODO NYI
 
 map_types = {
     'rapid',
@@ -20,7 +14,6 @@ map_types = {
     'silver',
     'busses',
     'trains',
-    'core',
     'all',
 }
 
@@ -39,7 +32,7 @@ def map_page(map_type: str):
 
     match map_type:
         case 'rapid':
-            routes = rapid_routes
+            routes = silver_line_routes + rapid_routes
         case 'commuter':
             routes = commuter_routes
         case 'silver':
@@ -48,8 +41,6 @@ def map_page(map_type: str):
             routes = bus_routes
         case 'trains':
             routes = commuter_routes + rapid_routes
-        case 'core':
-            routes = silver_line_routes + rapid_routes
         case 'all':
             routes = commuter_routes + silver_line_routes + rapid_routes
 

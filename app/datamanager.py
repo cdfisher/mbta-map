@@ -19,6 +19,8 @@ HEADERS = {
 
 BASE_URL = 'https://api-v3.mbta.com/'
 
+all_routes = commuter_routes + silver_line_routes + rapid_routes
+
 
 def _list_for_url(values: list) -> str:
     s = ''
@@ -27,7 +29,7 @@ def _list_for_url(values: list) -> str:
     return s[1:]
 
 
-def _query_api(route: str) -> (dict, int):
+def _query_api(route: str, headers=HEADERS) -> (dict, int):
     """Returns a (dict, int) tuple with the decoded response JSON and
         the response status code.
 
@@ -41,12 +43,20 @@ def _query_api(route: str) -> (dict, int):
 
         """
     try:
-        r = requests.get(f"{BASE_URL}{route}", headers=HEADERS)
+        r = requests.get(f"{BASE_URL}{route}", headers=headers)
         r.raise_for_status()
     except requests.exceptions.HTTPError as err:
         raise err
 
-    return json.loads(r.content.decode()), r.status_code
+    status = r.status_code
+    if status > 399:
+        raise requests.exceptions.HTTPError(f'Encountered HTTP error, status {status}')
+
+    # Necessary to play nicely with 304, etc.
+    if len(r.content) > 0:
+        return json.loads(r.content.decode()), status
+    else:
+        return {}, r.status_code
 
 
 def _polyline_to_coords(poly: str) -> list:
@@ -68,52 +78,109 @@ def build_route_df(route_ids: list):
     raise NotImplementedError
 
 
-def build_shape_df(route_ids: list) -> pd.DataFrame:
-    # TODO this probably isn't the most efficient way, and I'd like to cache it (once a day maybe?)
+def fetch_shapes(route_ids: list) -> pd.DataFrame:
+    # there might be a better way to do this but it's still a significant improvement I think
+    # todo update dynamically, will implement once I have a middleman server or a service updating this csv in a bucket
+    _headers = {
+        'User-Agent': USER_AGENT,
+        'x-api-key': MBTA_API_KEY,
+        'If-Modified-Since': 'Fri, 21 Mar 2025 19:59:59 GMT'
+        }
 
-    rows = []
-    for route in route_ids:
-        jdata, status = _query_api(f'/shapes?filter[route]={route}')
-        if status > 399:
-            raise requests.exceptions.HTTPError(f"Encountered HTTP error, status {status}")
+    j, status = _query_api(f'/shapes?filter[route]={_list_for_url(route_ids)}', headers=_headers)
 
-        shapes = []
-        for d in jdata['data']:
-            if 'canonical' in d['id']:
-                shapes.append(_polyline_to_coords(d['attributes']['polyline']))
+    if status == 304:
+        # load from pickle
+        df = pd.read_pickle('./data/shapes.pkl')
+    else:
+        df = build_shape_df(j)
 
-        for s in shapes:
-            rows.append([f"{route}", s, COLORS[route]])
-
-    return pd.DataFrame(rows, columns=['label', 'path', 'color'])
+    # filter just the routes passed as an argument
+    # todo sort df to order based on draw priority I want to use
+    return df[df['label'].isin(route_ids)]
 
 
-def build_stop_df(route_ids: list) -> pd.DataFrame:
+def build_shape_df(jdata: dict) -> pd.DataFrame:
+    rows, shapes, shape_ids = [], [], []
+
+    with open('./data/shape-to-route.json', 'r') as inf:
+        shape_to_route = json.load(inf)
+
+    for d in jdata['data']:
+        if 'canonical' in d['id']:
+            shapes.append(_polyline_to_coords(d['attributes']['polyline']))
+            shape_ids.append(d['id'])
+
+    for i in range(len(shape_ids)):
+        r = shape_to_route[shape_ids[i]]
+        rows.append([r, shapes[i], COLORS[r]])
+
+    df = pd.DataFrame(rows, columns=['label', 'path', 'color'])
+
+    # write pickle for all routes, since if this is running, all the cached data should be updated
+    df.to_pickle('./data/shapes.pkl')
+
+    return df
+
+
+def fetch_stops(route_ids: list) -> pd.DataFrame:
+    # there might be a better way to do this but it's still a significant improvement I think
+    # todo update dynamically, will implement once I have a middleman server or a service updating this csv in a bucket
+    _headers = {
+        'User-Agent': USER_AGENT,
+        'x-api-key': MBTA_API_KEY,
+        'If-Modified-Since': 'Fri, 21 Mar 2025 19:59:59 GMT'
+        }
+
+    j, status = _query_api(f'/stops?filter[route]={_list_for_url(route_ids)}', headers=_headers)
+    if status == 304:
+        # load from pickle
+        df = pd.read_pickle('./data/stops.pkl')
+    else:
+        df = build_stop_df(j)
+
+    with open('./data/route-to-stops.json', 'r') as inf:
+        route_to_stops = json.load(inf)
+
+    # filter just the routes passed as an argument
+    r = set(route_ids)
+    stops = set()
+    for s in r:
+        stops = stops.union(set(route_to_stops[s]))
+
+    # todo df.apply to filter routes_served and update color value based on this
+    return df[df['id'].isin(stops)]
+
+
+def build_stop_df(jdata: dict) -> pd.DataFrame:
     stop_dict = {}
-    for route in route_ids:
-        jdata, status = _query_api(f'/stops?filter[route]={route}')
-        if status > 399:
-            raise requests.exceptions.HTTPError(f'Encountered HTTP error, status {status}')
 
-        for d in jdata['data']:
-            if d['id'] not in stop_dict:
-                stop_dict[d['id']] = Stop(d, route=route)
-            else:
-                stop_dict[d['id']].add_route(route)
+    with open('./data/route-to-stops.json', 'r') as inf:
+        rts = json.load(inf)
+
+    route_to_stops = {}
+
+    for k in rts.keys():
+        route_to_stops[k] = set(rts[k])
+
+    for d in jdata['data']:
+        _id = d['id']
+        stop_dict[_id] = Stop(d)
+        for r in route_to_stops.keys():
+            if _id in route_to_stops[r]:
+                stop_dict[_id].add_route(r)
 
     rows = [v.row() for v in stop_dict.values()]
-
-    return pd.DataFrame(rows, columns=['name', 'label', 'id', 'location', 'routes_served', 'color'])
+    df = pd.DataFrame(rows, columns=['name', 'label', 'id', 'location', 'routes_served', 'color'])
+    df.to_pickle('./data/stops.pkl')
+    return df
 
 
 def build_vehicle_df(route_ids: list) -> pd.DataFrame:
     vehicle_dict = {}
-    jdata, status = _query_api(f'/vehicles?fields[vehicle]=bearing,current_status,carriages,'
+    jdata, _ = _query_api(f'/vehicles?fields[vehicle]=bearing,current_status,carriages,'
                                f'latitude,longitude,direction_id,revenue_status,speed,updated_at'
                                f'&include=trip.headsign&filter[route]={_list_for_url(route_ids)}')
-
-    if status > 399:
-        raise requests.exceptions.HTTPError(f'Encountered HTTP error, status {status}')
 
     headsigns = {}
     for d in jdata['included']:

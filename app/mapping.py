@@ -4,7 +4,7 @@ from datamanager import *
 
 
 def build_lines_layer(route_ids: list) -> pdk.Layer:
-    routes_df = build_shape_df(route_ids)
+    routes_df = fetch_shapes(route_ids)
 
     path_layer = pdk.Layer(
         type='PathLayer',
@@ -22,11 +22,9 @@ def build_lines_layer(route_ids: list) -> pdk.Layer:
 
 # TODO maybe migrate to IconLayer
 def build_stops_layer(route_ids: list) -> pdk.Layer:
-    stops_df = build_stop_df(route_ids)
-
+    stops_df = fetch_stops(route_ids)
 
     # previously used a label value of f"<h3 style=\"margin:0;padding:0;\">{s.name}</h3>"
-
     # TODO add routes served, stop info label, next trains prediction
 
     stops_layer = pdk.Layer(
