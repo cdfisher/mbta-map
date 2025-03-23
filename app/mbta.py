@@ -46,6 +46,15 @@ colors = {
     'Bus': (255, 199, 44), # This case won't get hit directly but is included for reference
 }
 
+df_color_sort_order = [(255, 199, 44),
+                       (124, 135, 142),
+                       (128, 39, 108),
+                       (0, 132, 61),
+                       (0, 61, 165),
+                       (237, 139, 0),
+                       (255, 0, 0),
+                       ]
+
 rapid_routes = ['Red', 'Blue', 'Orange', 'Green-B', 'Green-C', 'Green-D', 'Green-E']
 commuter_routes = ['CR-Fairmount', 'CR-Fitchburg', 'CR-Worcester', 'CR-Franklin', 'CR-Greenbush', 'CR-Haverhill',
                    'CR-Kingston', 'CR-Lowell', 'CR-Middleborough', 'CR-Needham', 'CR-Newburyport', 'CR-Providence',
@@ -77,12 +86,9 @@ def get_priority(line: str) -> int:
 
 def update_color(v: str | deque | list) -> tuple:
     if type(v) is collections.deque or type(v) is list:
-        print(f'v: {v}')
         k = v[0]
-        print(f'k: {k}')
     else:
         k = v
-        print(f'k = v: {k}')
     return colors[k[:2]] if k[:2] in colors.keys() else (255, 199, 44)
 
 

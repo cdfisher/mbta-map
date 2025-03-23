@@ -107,8 +107,13 @@ def fetch_shapes(route_ids: list) -> pd.DataFrame:
     else:
         df = build_shape_df(j)
 
+    # Sort df based on color values to follow draw order priority
+    color_sorter = dict(zip(df_color_sort_order, range(len(df_color_sort_order))))
+    df['sort_order'] = df['color'].map(color_sorter)
+    df.sort_values('sort_order', inplace=True)
+    df.drop('sort_order', axis='columns', inplace=True)
+
     # filter just the routes passed as an argument
-    # todo sort df to order based on draw priority I want to use
     return df[df['label'].isin(route_ids)]
 
 
@@ -130,7 +135,7 @@ def build_shape_df(jdata: dict) -> pd.DataFrame:
     df = pd.DataFrame(rows, columns=['label', 'path', 'color'])
 
     # write pickle for all routes, since if this is running, all the cached data should be updated
-    df.to_pickle('./data/shapes.pkl')
+    #df.to_pickle('./data/shapes.pkl')
 
     return df
 
@@ -168,6 +173,7 @@ def fetch_stops(route_ids: list) -> pd.DataFrame:
     df = df[df.routes_served.astype(bool)]
     # update color
     df['color'] = df['routes_served'].apply(update_color)
+
     return df
 
 
@@ -191,7 +197,7 @@ def build_stop_df(jdata: dict) -> pd.DataFrame:
 
     rows = [v.row() for v in stop_dict.values()]
     df = pd.DataFrame(rows, columns=['name', 'label', 'id', 'location', 'routes_served', 'color'])
-    df.to_pickle('./data/stops.pkl')
+    #df.to_pickle('./data/stops.pkl')
     return df
 
 
