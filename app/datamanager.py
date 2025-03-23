@@ -69,6 +69,18 @@ def _polyline_to_coords(poly: str) -> list:
     return coords
 
 
+def _filter_deque(d: deque, included_elements: set) -> deque:
+    # filters deque to include only the elements in a set, while maintaining relative positions in the deque
+    d_prime = deque([])
+    d.reverse()
+    while len(d) > 0:
+        e = d.pop()
+        if e in included_elements:
+            d_prime.append(e)
+
+    return d_prime
+
+
 def build_route_df(route_ids: list):
     # TODO NYI
     # use /routes?filter[type]=<routes> to get name, route_id, color, text_color, direction names,
@@ -148,8 +160,15 @@ def fetch_stops(route_ids: list) -> pd.DataFrame:
     for s in r:
         stops = stops.union(set(route_to_stops[s]))
 
-    # todo df.apply to filter routes_served and update color value based on this
-    return df[df['id'].isin(stops)]
+    # Filter the routes_served for each stop to only include routes in route_ids and
+    # update the color to be based on this new filtered group of routes
+    df = df[df['id'].isin(stops)]
+    # filter routes_served to only include those in route_types
+    df['routes_served'] = df['routes_served'].apply(lambda x: list(_filter_deque(x, r)))
+    df = df[df.routes_served.astype(bool)]
+    # update color
+    df['color'] = df['routes_served'].apply(update_color)
+    return df
 
 
 def build_stop_df(jdata: dict) -> pd.DataFrame:

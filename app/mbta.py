@@ -1,3 +1,4 @@
+import collections
 from collections import deque
 
 # TODO this can probably be handled better
@@ -72,6 +73,17 @@ def get_priority(line: str) -> int:
             else:
                 #Default to bus priority
                 return 0
+
+
+def update_color(v: str | deque | list) -> tuple:
+    if type(v) is collections.deque or type(v) is list:
+        print(f'v: {v}')
+        k = v[0]
+        print(f'k: {k}')
+    else:
+        k = v
+        print(f'k = v: {k}')
+    return colors[k[:2]] if k[:2] in colors.keys() else (255, 199, 44)
 
 
 class Carriage:
