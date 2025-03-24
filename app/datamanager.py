@@ -130,7 +130,7 @@ def build_shape_df(jdata: dict) -> pd.DataFrame:
 
     for i in range(len(shape_ids)):
         r = shape_to_route[shape_ids[i]]
-        rows.append([r, shapes[i], COLORS[r]])
+        rows.append([r, shapes[i], get_color(r)])
 
     df = pd.DataFrame(rows, columns=['label', 'path', 'color'])
 
@@ -167,7 +167,6 @@ def fetch_stops(route_ids: list) -> pd.DataFrame:
     # hacky fix for silver line stops being filtered accidentally
     if not r.isdisjoint({'741', '742', '734', '746', '749', '751'}):
         r = r.union({'SL1', 'SL2', 'SL3', 'SL4', 'SL5', 'SLW'})
-    print(r)
     stops = set()
     for s in r:
         stops = stops.union(set(route_to_stops[s]))
@@ -212,11 +211,16 @@ def build_vehicle_df(route_ids: list) -> pd.DataFrame:
     vehicle_dict = {}
     jdata, _ = _query_api(f'/vehicles?fields[vehicle]=bearing,current_status,carriages,'
                                f'latitude,longitude,direction_id,revenue_status,speed'
-                               f'&include=trip.headsign&filter[route]={_list_for_url(route_ids)}')
+                               f'&include=trip,route&filter[route]={_list_for_url(route_ids)}')
 
     headsigns = {}
+    route_colors = {}
     for d in jdata['included']:
-        headsigns[d['id']] = d['attributes']['headsign']
+        # todo including routes breaks this, handle
+        if 'headsign' in d['attributes'].keys():
+            headsigns[d['id']] = d['attributes']['headsign']
+        elif 'color' in d['attributes'].keys():
+            route_colors[d['id']] = parse_color(d['attributes']['color'])
 
     for v in jdata['data']:
         try:
@@ -226,10 +230,14 @@ def build_vehicle_df(route_ids: list) -> pd.DataFrame:
             # set it to None
             headsign = None
 
-        vehicle_dict[v['id']] = Vehicle(v, headsign=headsign)
+        try:
+            color = route_colors[v['relationships']['route']['data']['id']]
+        except KeyError:
+            # if trip doesn't exist in the included data (which seems to happen for a small number of IDs,
+            # set it to None
+            color = None
 
-    # TODO implement predictions for next stop
-    # vehicles are in a dict so a lookup can be done for predictions
+        vehicle_dict[v['id']] = Vehicle(v, headsign=headsign, color=color)
 
     rows = [v.row() for v in vehicle_dict.values()]
     return pd.DataFrame(rows, columns=['label', 'location', 'color', 'bearing', 'icon', 'trip_id', 'vehicle_id'])
@@ -245,6 +253,8 @@ def get_predictions(df: pd.DataFrame):
         stop_lookup = json.load(inf)
 
     for d in j['data']:
+        if d['relationships']['vehicle']['data'] is None:
+            continue
         v = d['relationships']['vehicle']['data']['id']
         if v not in predictions_dict:
             predictions_dict[v] = Prediction(d, j['included'])

@@ -2,31 +2,6 @@ import collections
 import datetime
 from collections import deque
 
-# TODO this can probably be handled better
-COLORS = {
-    'Red': (255, 0, 0),
-    'Orange': (237, 139, 0),
-    'Blue': (0, 61, 165),
-    'Green-B': (0, 132, 61),
-    'Green-C': (0, 132, 61),
-    'Green-D': (0, 132, 61),
-    'Green-E': (0, 132, 61),
-    'CR-Fairmount': (128, 39, 108),
-    'CR-Fitchburg': (128, 39, 108),
-    'CR-Worcester': (128, 39, 108),
-    'CR-Franklin': (128, 39, 108),
-    'CR-Greenbush': (128, 39, 108),
-    'CR-Haverhill': (128, 39, 108),
-    'CR-Kingston': (128, 39, 108),
-    'CR-Lowell': (128, 39, 108),
-    'CR-Middleborough': (128, 39, 108),
-    'CR-Needham': (128, 39, 108),
-    'CR-Newburyport': (128, 39, 108),
-    'CR-Providence': (128, 39, 108),
-    'CR-Foxboro': (128, 39, 108),
-    'CR-NewBedford': (128, 39, 108),
-}
-
 silver_line_route_names = {
     '741': 'SL1',
     '742': 'SL2',
@@ -44,7 +19,7 @@ colors = {
     'Gr': (0, 132, 61),
     'CR': (128, 39, 108),
     'SL': (124, 135, 142),
-    'Bus': (255, 199, 44), # This case won't get hit directly but is included for reference
+    'Bus': (255, 199, 44),  # This case won't get hit directly but is included for reference
 }
 
 df_color_sort_order = [(255, 199, 44),
@@ -61,7 +36,39 @@ commuter_routes = ['CR-Fairmount', 'CR-Fitchburg', 'CR-Worcester', 'CR-Franklin'
                    'CR-Kingston', 'CR-Lowell', 'CR-Middleborough', 'CR-Needham', 'CR-Newburyport', 'CR-Providence',
                    'CR-Foxboro', 'CR-NewBedford']
 silver_line_routes = ['741', '742', '743', '746', '749', '751']
-bus_routes = [] # Includes SL TODO NYI
+bus_routes = []  # Includes SL TODO NYI
+
+
+def get_color(route: str) -> (int, int, int):
+    match route:
+        case 'Red':
+            return (255, 0, 0)
+        case 'Orange':
+            return (237, 139, 0)
+        case 'Blue':
+            return (0, 61, 165)
+        case 'Green-B' | 'Green-C' | 'Green-D' | 'Green-E':
+            return (0, 132, 61)
+        case '741' | '742' | '743' | '749' | '751':
+            return (124, 135, 142)
+        case _:
+            if route[:2] == 'CR':
+                return (128, 39, 108)
+            else:
+                return (255, 199, 44)
+
+
+def parse_color(_hex: str) -> tuple:
+    """Parse a hex string representation of a color inta an (r: int, g: int, b: int) tuple
+
+    :param _hex: hex string representation of a color in the form rrggbb
+    :return: Tuple of red, green, and blue int values. Defaults to the such tuple representing the color for busses
+    :rtype: (int, int, int)
+    """
+    if _hex is None:
+        return (255, 199, 44)
+    r, g, b = _hex[:2], _hex[2:4], _hex[4:]
+    return int(r, base=16), int(g, base=16), int(b, base=16)
 
 
 def get_priority(line: str) -> int:
@@ -81,7 +88,7 @@ def get_priority(line: str) -> int:
                 # Silver Line route IDs
                 return 1
             else:
-                #Default to bus priority
+                # Default to bus priority
                 return 0
 
 
@@ -93,6 +100,28 @@ def update_color(v: str | deque | list) -> tuple:
     return colors[k[:2]] if k[:2] in colors.keys() else (255, 199, 44)
 
 
+def parse_time(t: str) -> datetime.datetime:
+    if t is None:
+        return None
+    # sample time format: 2017-08-14T15:38:58-04:00
+    #  %Y-%B-%dT%H:%M%S%:z
+    # The above isn't supported on all platforms so strip the last colon
+    return datetime.datetime.strptime(f'{t[:22]}{t[23:]}', '%Y-%m-%dT%H:%M:%S%z')
+
+
+def get_vehicle_status_and_stop(vehicle_id: str, d: dict, inc: dict) -> (str | None, str | None):
+    for v in inc:
+        if v['id'] == vehicle_id:
+            _status = v['attributes']['current_status']
+            _stop_data = v['relationships']['stop']['data']
+            status = None if _status is None else _status
+            stop_id = None if _stop_data is None else _stop_data['id']
+
+            return status, stop_id
+
+    return None, None
+
+
 class Carriage:
     def __init__(self, c: dict):
         self.label = c['label']
@@ -101,24 +130,20 @@ class Carriage:
 
 
 class Vehicle:
-    def __init__(self, r: dict, headsign=''):
+    def __init__(self, r: dict, headsign='', color=(255, 199, 44)):
         rel = r['relationships']
         attr = r['attributes']
 
-        # TODO including route.color should be able to replace this
         # This will be set later for all rapid transit and CR vehicles, so defaults to the color for busses
-        self.color = (255, 199, 44)
+        self.color = color
 
         self.vehicle_id = r['id']
 
         # under relationships
         self.route = rel['route']['data']['id']  # for instance 'Green-B'
-        if self.route[:2] in colors.keys():
-            self.color = colors[self.route[:2]]
         # Handle SL route IDs just being numerical values since the short names are more helpful for those
         if self.route in silver_line_route_names.keys():
             self.route = silver_line_route_names[self.route]
-            self.color = (124, 135, 142)
 
         self.trip_id = rel['trip']['data']['id']  # (usually?) numerical trip ID
         if rel['stop']['data'] is not None:
@@ -139,7 +164,6 @@ class Vehicle:
             self.revenue = None
 
         self.speed = attr['speed']  # in m/s, often null
-        #self.updated_at = attr['updated_at']
 
         self.headsign = headsign
 
@@ -161,9 +185,9 @@ class Vehicle:
 
     def get_icon(self) -> dict:
         # TODO this approach is a bit messy, clean up
-        c = self.color
-        match c:
-            case (255, 0, 0):
+        match self.color:
+            # There appear to be two different possible values for color for the Red Line
+            case (255, 0, 0) | (218, 41, 28):
                 color_string = 'red'
             case (237, 139, 0):
                 color_string = 'orange'
@@ -187,7 +211,8 @@ class Vehicle:
 
     # TODO this may need additional values added
     def row(self) -> list:
-        return [self.build_label(), self.location, self.color, self.bearing, self.get_icon(), self.trip_id, self.vehicle_id]
+        return [self.build_label(), self.location, self.color, self.bearing, self.get_icon(), self.trip_id,
+                self.vehicle_id]
 
 
 class Stop:
@@ -220,7 +245,7 @@ class Stop:
         else:
             self.routes_served.append(route)
 
-    def get_color(self):
+    def _get_color(self):
         try:
             if self.routes_served[0][:2] in colors.keys():
                 return colors[self.routes_served[0][:2]]
@@ -233,29 +258,12 @@ class Stop:
 
     def row(self) -> list:
         return [self.name, f"<h3 style=\"margin:0;padding:0;\">{self.name}</h3>",
-                self.stop_id, self.location, list(self.routes_served), self.get_color()]
+                self.stop_id, self.location, list(self.routes_served), self._get_color()]
 
 
 class Station:
     def __init__(self):
         raise NotImplementedError('Station objects have not yet been implemented, use Stop objects instead')
-
-
-def parse_time(t: str) -> datetime.datetime:
-    if t is None:
-        return None
-    # sample time format: 2017-08-14T15:38:58-04:00
-    #  %Y-%B-%dT%H:%M%S%:z
-    # The above isn't supported on all platforms so strip the last colon
-    return datetime.datetime.strptime(f'{t[:22]}{t[23:]}', '%Y-%m-%dT%H:%M:%S%z')
-
-
-def get_vehicle_status_and_stop(vehicle_id: str, d: dict, inc: dict) -> (str|None, str|None):
-    for v in inc:
-        if v['id'] == vehicle_id:
-            return v['attributes']['current_status'], v['relationships']['stop']['data']['id']
-
-    return None, None
 
 
 class Prediction:
@@ -286,7 +294,7 @@ class Prediction:
             return self.status
 
         if self.departure_time is None:
-           return ''
+            return ''
 
         if self.arrival_time is not None:
             t = self.arrival_time
@@ -319,7 +327,8 @@ class Prediction:
         _new_rel = d['relationships']
 
         uncertainty = self.arrival_uncertainty if self.arrival_uncertainty is not None else self.departure_uncertainty
-        new_uncertainty = _new_attr['arrival_uncertainty'] if _new_attr['arrival_uncertainty'] is not None else _new_attr['departure_uncertainty']
+        new_uncertainty = _new_attr['arrival_uncertainty'] if _new_attr['arrival_uncertainty'] is not None else \
+        _new_attr['departure_uncertainty']
 
         # _time and _uncertainty values can be None
         # null for arrival means it's the first stop of the trip
