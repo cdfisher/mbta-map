@@ -47,7 +47,7 @@ def build_stops_layer(route_ids: list) -> pdk.Layer:
 
 
 def build_vehicles_layer(route_ids: list) -> pdk.Layer:
-    vehicles_df = build_vehicle_df(route_ids)
+    vehicles_df = get_predictions(build_vehicle_df(route_ids))
 
     vehicles_layer = pdk.Layer(
         'IconLayer',

@@ -1,4 +1,5 @@
 import collections
+import datetime
 from collections import deque
 
 # TODO this can probably be handled better
@@ -108,6 +109,8 @@ class Vehicle:
         # This will be set later for all rapid transit and CR vehicles, so defaults to the color for busses
         self.color = (255, 199, 44)
 
+        self.vehicle_id = r['id']
+
         # under relationships
         self.route = rel['route']['data']['id']  # for instance 'Green-B'
         if self.route[:2] in colors.keys():
@@ -136,7 +139,7 @@ class Vehicle:
             self.revenue = None
 
         self.speed = attr['speed']  # in m/s, often null
-        self.updated_at = attr['updated_at']
+        #self.updated_at = attr['updated_at']
 
         self.headsign = headsign
 
@@ -184,7 +187,7 @@ class Vehicle:
 
     # TODO this may need additional values added
     def row(self) -> list:
-        return [self.build_label(), self.location, self.color, self.bearing, self.get_icon()]
+        return [self.build_label(), self.location, self.color, self.bearing, self.get_icon(), self.trip_id, self.vehicle_id]
 
 
 class Stop:
@@ -236,3 +239,100 @@ class Stop:
 class Station:
     def __init__(self):
         raise NotImplementedError('Station objects have not yet been implemented, use Stop objects instead')
+
+
+def parse_time(t: str) -> datetime.datetime:
+    if t is None:
+        return None
+    # sample time format: 2017-08-14T15:38:58-04:00
+    #  %Y-%B-%dT%H:%M%S%:z
+    # The above isn't supported on all platforms so strip the last colon
+    return datetime.datetime.strptime(f'{t[:22]}{t[23:]}', '%Y-%m-%dT%H:%M:%S%z')
+
+
+def get_vehicle_status_and_stop(vehicle_id: str, d: dict, inc: dict) -> (str|None, str|None):
+    for v in inc:
+        if v['id'] == vehicle_id:
+            return v['attributes']['current_status'], v['relationships']['stop']['data']['id']
+
+    return None, None
+
+
+class Prediction:
+    def __init__(self, d: dict, inc: dict):
+        _attr = d['attributes']
+        _rel = d['relationships']
+
+        # attributes
+        self.arrival_time = parse_time(_attr['arrival_time'])
+        self.arrival_uncertainty = _attr['arrival_uncertainty']
+        self.departure_time = parse_time(_attr['departure_time'])
+        self.departure_uncertainty = _attr['departure_uncertainty']
+        self.stop_sequence = _attr['stop_sequence']
+        self.direction_id = _attr['direction_id']
+        self.status = _attr['status']
+
+        # relationships
+        self.stop_id = _rel['stop']['data']['id']
+        self.vehicle = _rel['vehicle']['data']['id']
+        self.trip_id = _rel['trip']['data']['id']
+
+        self.vehicle_status, self.vehicle_stop = get_vehicle_status_and_stop(self.vehicle, d, inc)
+
+    def get_countdown_string(self) -> str:
+        # Mostly follows the "Countdown Display Rules" (exceptions noted) here:
+        # https://www.mbta.com/developers/v3-api/best-practices
+        if self.status is not None:
+            return self.status
+
+        if self.departure_time is None:
+           return ''
+
+        if self.arrival_time is not None:
+            t = self.arrival_time
+        else:
+            t = self.departure_time
+
+        td = t - datetime.datetime.now(datetime.timezone.utc)
+        s = td.total_seconds()
+
+        if s < 0:
+            return ''
+
+        if s <= 90 and self.vehicle_status == 'STOPPED_AT' and self.vehicle_stop == self.stop_id:
+            return 'Boarding'
+        if s <= 30:
+            return 'Arriving'
+        if s <= 60:
+            return 'Approaching'
+        m = int(s // 60) if s % 60 < 30 else int((s // 60) + 1)
+        if m >= 20:
+            return '20+ minutes'
+        if m == 1:
+            return '1 minute'
+        else:
+            return f'{m} minutes'
+
+    def update_time_and_stop(self, d: dict):
+        # TODO handle cases where current or prev arrival or departure is null
+        _new_attr = d['attributes']
+        _new_rel = d['relationships']
+
+        uncertainty = self.arrival_uncertainty if self.arrival_uncertainty is not None else self.departure_uncertainty
+        new_uncertainty = _new_attr['arrival_uncertainty'] if _new_attr['arrival_uncertainty'] is not None else _new_attr['departure_uncertainty']
+
+        # _time and _uncertainty values can be None
+        # null for arrival means it's the first stop of the trip
+        # null for departure means it's the last
+        if self.arrival_time is None:
+            # first stop of the trip so stop here
+            return
+
+        if _new_attr['stop_sequence'] < self.stop_sequence and new_uncertainty < uncertainty:
+            self.arrival_time = parse_time(_new_attr['arrival_time'])
+            self.arrival_uncertainty = _new_attr['arrival_uncertainty']
+            self.departure_time = parse_time(_new_attr['departure_time'])
+            self.departure_uncertainty = _new_attr['departure_uncertainty']
+            self.stop_sequence = _new_attr['stop_sequence']
+            self.stop_id = _new_rel['stop']['data']['id']
+            self.status = _new_attr['status']

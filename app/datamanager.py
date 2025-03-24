@@ -43,6 +43,7 @@ def _query_api(route: str, headers=HEADERS) -> (dict, int):
 
         """
     try:
+        print(route)
         r = requests.get(f"{BASE_URL}{route}", headers=headers)
         r.raise_for_status()
     except requests.exceptions.HTTPError as err:
@@ -165,6 +166,8 @@ def fetch_stops(route_ids: list) -> pd.DataFrame:
     for s in r:
         stops = stops.union(set(route_to_stops[s]))
 
+    df.to_csv('silver_missing.csv')
+
     # Filter the routes_served for each stop to only include routes in route_ids and
     # update the color to be based on this new filtered group of routes
     df = df[df['id'].isin(stops)]
@@ -173,6 +176,8 @@ def fetch_stops(route_ids: list) -> pd.DataFrame:
     df = df[df.routes_served.astype(bool)]
     # update color
     df['color'] = df['routes_served'].apply(update_color)
+
+    df.to_csv('silver_missing-f.csv')
 
     return df
 
@@ -204,7 +209,7 @@ def build_stop_df(jdata: dict) -> pd.DataFrame:
 def build_vehicle_df(route_ids: list) -> pd.DataFrame:
     vehicle_dict = {}
     jdata, _ = _query_api(f'/vehicles?fields[vehicle]=bearing,current_status,carriages,'
-                               f'latitude,longitude,direction_id,revenue_status,speed,updated_at'
+                               f'latitude,longitude,direction_id,revenue_status,speed'
                                f'&include=trip.headsign&filter[route]={_list_for_url(route_ids)}')
 
     headsigns = {}
@@ -225,4 +230,31 @@ def build_vehicle_df(route_ids: list) -> pd.DataFrame:
     # vehicles are in a dict so a lookup can be done for predictions
 
     rows = [v.row() for v in vehicle_dict.values()]
-    return pd.DataFrame(rows, columns=['label', 'location', 'color', 'bearing', 'icon'])
+    return pd.DataFrame(rows, columns=['label', 'location', 'color', 'bearing', 'icon', 'trip_id', 'vehicle_id'])
+
+
+def get_predictions(df: pd.DataFrame):
+    # https://api-v3.mbta.com/predictions?sort=arrival_time&include=vehicle.status&filter[trip]=TRIPS
+    trip_ids = df['trip_id'].unique()
+    j, _ = _query_api(f'/predictions?sort=arrival_time&include=vehicle.status&filter[trip]={_list_for_url(trip_ids)}')
+    predictions_dict = {}
+
+    with open('./data/stop-id-to-name.json', 'r') as inf:
+        stop_lookup = json.load(inf)
+
+    for d in j['data']:
+        v = d['relationships']['vehicle']['data']['id']
+        if v not in predictions_dict:
+            predictions_dict[v] = Prediction(d, j['included'])
+        else:
+            predictions_dict[v].update_time_and_stop(d)
+
+    for k in predictions_dict.keys():
+        # get vehicle ID
+        p = predictions_dict[k]
+
+        # for the row in vehicles_df where trip ids match:
+        idx = df.index[df['vehicle_id'] == p.vehicle][0]
+        df.at[idx, 'label'] = f"{df.at[idx, 'label']}<br><b>Next stop: </b>{stop_lookup[p.stop_id]}: {p.get_countdown_string()}"
+
+    return df
