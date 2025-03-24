@@ -43,7 +43,6 @@ def _query_api(route: str, headers=HEADERS) -> (dict, int):
 
         """
     try:
-        print(route)
         r = requests.get(f"{BASE_URL}{route}", headers=headers)
         r.raise_for_status()
     except requests.exceptions.HTTPError as err:
@@ -157,16 +156,21 @@ def fetch_stops(route_ids: list) -> pd.DataFrame:
     else:
         df = build_stop_df(j)
 
+    # If SL stops stop loading again, add the 'SL'- route names back to this as copies of the numerical k-v pairs
     with open('./data/route-to-stops.json', 'r') as inf:
         route_to_stops = json.load(inf)
 
     # filter just the routes passed as an argument
     r = set(route_ids)
+
+    # TODO get rid of this and rename SL routes later down the line rather than when building the DF
+    # hacky fix for silver line stops being filtered accidentally
+    if not r.isdisjoint({'741', '742', '734', '746', '749', '751'}):
+        r = r.union({'SL1', 'SL2', 'SL3', 'SL4', 'SL5', 'SLW'})
+    print(r)
     stops = set()
     for s in r:
         stops = stops.union(set(route_to_stops[s]))
-
-    df.to_csv('silver_missing.csv')
 
     # Filter the routes_served for each stop to only include routes in route_ids and
     # update the color to be based on this new filtered group of routes
@@ -176,8 +180,6 @@ def fetch_stops(route_ids: list) -> pd.DataFrame:
     df = df[df.routes_served.astype(bool)]
     # update color
     df['color'] = df['routes_served'].apply(update_color)
-
-    df.to_csv('silver_missing-f.csv')
 
     return df
 
