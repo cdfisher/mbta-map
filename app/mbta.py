@@ -328,7 +328,7 @@ class Prediction:
 
         uncertainty = self.arrival_uncertainty if self.arrival_uncertainty is not None else self.departure_uncertainty
         new_uncertainty = _new_attr['arrival_uncertainty'] if _new_attr['arrival_uncertainty'] is not None else \
-        _new_attr['departure_uncertainty']
+            _new_attr['departure_uncertainty']
 
         # _time and _uncertainty values can be None
         # null for arrival means it's the first stop of the trip

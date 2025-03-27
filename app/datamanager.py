@@ -96,7 +96,7 @@ def fetch_shapes(route_ids: list) -> pd.DataFrame:
     _headers = {
         'User-Agent': USER_AGENT,
         'x-api-key': MBTA_API_KEY,
-        'If-Modified-Since': 'Fri, 21 Mar 2025 19:59:59 GMT'
+        'If-Modified-Since': 'Thu, 27 Mar 2025 15:46:06 GMT'
         }
 
     j, status = _query_api(f'/shapes?filter[route]={_list_for_url(route_ids)}', headers=_headers)
@@ -146,7 +146,7 @@ def fetch_stops(route_ids: list) -> pd.DataFrame:
     _headers = {
         'User-Agent': USER_AGENT,
         'x-api-key': MBTA_API_KEY,
-        'If-Modified-Since': 'Fri, 21 Mar 2025 19:59:59 GMT'
+        'If-Modified-Since': 'Thu, 27 Mar 2025 15:46:06 GMT'
         }
 
     j, status = _query_api(f'/stops?filter[route]={_list_for_url(route_ids)}', headers=_headers)
@@ -216,7 +216,6 @@ def build_vehicle_df(route_ids: list) -> pd.DataFrame:
     headsigns = {}
     route_colors = {}
     for d in jdata['included']:
-        # todo including routes breaks this, handle
         if 'headsign' in d['attributes'].keys():
             headsigns[d['id']] = d['attributes']['headsign']
         elif 'color' in d['attributes'].keys():
